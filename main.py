@@ -13,6 +13,8 @@ from datetime import datetime, timezone
 from copy import deepcopy
 
 
+
+
 logger              = logging.getLogger("omblepy")
 bleClient           = None
 deviceSpecific = None
@@ -47,7 +49,7 @@ RX_CHANNEL_UUIDS = [
 ]
 ble_client = None 
 
-
+#v3
 def parse_device_dt(dt):
     """
     Terima string atau datetime. Return datetime object (naive, lokal).
@@ -116,6 +118,7 @@ async def scan_devices():
         return {"devices": devices, "message": "Perangkat BLE berhasil dipindai"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Tolong hidupkan bluetooth: {str(e)}")
+    
 
 @app.post("/latest-bp-records")
 async def connect_and_read_latest(data: ConnectAndReadInput):
@@ -224,16 +227,32 @@ async def connect_and_read(data: ConnectAndReadInput):
                 # HANYA normalize, JANGAN adjust
                 normalized = normalize_records_datetime(records)
 
-                # Simpan langsung tanpa koreksi waktu
-                appendCsv(normalized)
-                saveUBPMJson(normalized)
+                #Tanpa save ke CSV & JSON 
+                all_records = []
+                for user_records in normalized:
+                    for rec in user_records:
+                        rec_copy = dict(rec)
+                        if isinstance(rec_copy["datetime"], datetime):
+                            rec_copy["datetime"] = rec_copy["datetime"].strftime("%Y-%m-%d %H:%M:%S")
+                        all_records.append(rec_copy)
 
                 return {
                     "message": "Data read successfully.",
                     "mac_address": selected_device.address,
                     "device_name": selected_device.name,
-                    "records": [r for u in normalized for r in u]
+                    "records": all_records  # ✅ datetime sudah string
                 }
+
+                                # Simpan langsung tanpa koreksi waktu
+                # appendCsv(normalized)
+                # saveUBPMJson(normalized)
+
+                # return {
+                #     "message": "Data read successfully.",
+                #     "mac_address": selected_device.address,
+                #     "device_name": selected_device.name,
+                #     "records": [r for u in normalized for r in u]
+                # }
         finally:
             if client.is_connected:
                 await client.disconnect()
@@ -241,57 +260,5 @@ async def connect_and_read(data: ConnectAndReadInput):
         import traceback
         print("TRACEBACK:", traceback.format_exc())
         raise HTTPException(status_code=500, detail=f"Error: {str(e)}")
-    """
-    Menghubungkan ke perangkat Omron dan hanya membaca data pengukuran terbaru.
-    Parameter:
-    - `pairing`: Jika True, hanya melakukan pairing.
-    - `sync_time`: Jika True, menyinkronkan waktu perangkat.
-    """
-    try:
-        devices = await BleakScanner.discover()
-        selected_device = next((dev for dev in devices if dev.address == data.mac_address), None)
-        if not selected_device:
-            raise HTTPException(status_code=404, detail="Device not found during scan.")
-        
-        client = BleakClient(selected_device.address)
-        print("Device: ", selected_device.address, selected_device.name)
-        try:
-            await client.connect()
-            await client.pair(protection_level=2)
-            if not client.is_connected:
-                raise HTTPException(status_code=500, detail="Failed to connect to the BLE device.")
+                    
 
-            bluetoothTxRxObj = bluetoothTxRxHandler(client)
-            dev_driver = deviceSpecificDriver()
-
-            if data.pairing:
-                if dev_driver.deviceUseLockUnlock:
-                    await bluetoothTxRxObj.writeNewUnlockKey()
-
-                await bluetoothTxRxObj.startTransmission()
-                await bluetoothTxRxObj.endTransmission()
-                return { "message": "Pairing successful." }
-            else:
-                await bluetoothTxRxObj.startTransmission()
-                records = await dev_driver.getRecords(
-                    btobj=bluetoothTxRxObj,
-                    useUnreadCounter=data.new_records_only,
-                    syncTime=data.sync_time,
-                )
-                await bluetoothTxRxObj.endTransmission()
-                if not records:
-                    raise HTTPException(status_code=404, detail="No records found.")
-                # latest_record = records[-1][-1] 
-                tmp_latest = max([r for u in records for r in u], key=lambda r: r["datetime"])
-                latest_record = adjust_latest_to_today(tmp_latest)
-                return {
-                    "message": "Newest record read with success.",
-                    "mac_address": selected_device.address,
-                    "device_name": selected_device.name,
-                    "latest_record": latest_record
-                }
-        finally:
-            if client.is_connected:
-                await client.disconnect()
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error: {str(e)}")

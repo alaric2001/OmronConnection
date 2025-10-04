@@ -8,12 +8,10 @@ from sharedDriver import sharedDeviceDriverCode
 
 class deviceSpecificDriver(sharedDeviceDriverCode):
     deviceEndianess                 = "little"
-    deviceCheckParentUUID           = False
-    deviceUseLockUnlock             = False
-    userStartAdressesList           = [0x02e8]
+    userStartAdressesList           = [0x0098]
     perUserRecordsCountList         = [60]
-    recordByteSize                  = 0x0e
-    transmissionBlockSize           = 0x08
+    recordByteSize                  = 0x10
+    transmissionBlockSize           = 0x10
     
     settingsReadAddress             = 0x0010
     settingsWriteAddress            = 0x0054
@@ -23,18 +21,18 @@ class deviceSpecificDriver(sharedDeviceDriverCode):
     
     def deviceSpecific_ParseRecordFormat(self, singleRecordAsByteArray):
         recordDict             = dict()
-        minute                 = self._bytearrayBitsToInt(singleRecordAsByteArray, 68-16, 73-16)
-        second                 = self._bytearrayBitsToInt(singleRecordAsByteArray, 74-16, 79-16)
+        minute                 = self._bytearrayBitsToInt(singleRecordAsByteArray, 68, 73)
+        second                 = self._bytearrayBitsToInt(singleRecordAsByteArray, 74, 79)
         second                 = min([second, 59]) #for some reason the second value can range up to 63
-        recordDict["mov"]      = self._bytearrayBitsToInt(singleRecordAsByteArray, 80-16, 80-16)
-        recordDict["ihb"]      = self._bytearrayBitsToInt(singleRecordAsByteArray, 81-16, 81-16)
-        month                  = self._bytearrayBitsToInt(singleRecordAsByteArray, 82-16, 85-16)
-        day                    = self._bytearrayBitsToInt(singleRecordAsByteArray, 86-16, 90-16)
-        hour                   = self._bytearrayBitsToInt(singleRecordAsByteArray, 91-16, 95-16)
-        year                   = self._bytearrayBitsToInt(singleRecordAsByteArray, 98-16, 103-16) + 2000
-        recordDict["bpm"]      = self._bytearrayBitsToInt(singleRecordAsByteArray, 104-16, 111-16)
-        recordDict["dia"]      = self._bytearrayBitsToInt(singleRecordAsByteArray, 112-16, 119-16)
-        recordDict["sys"]      = self._bytearrayBitsToInt(singleRecordAsByteArray, 120-16,  127-16) + 25
+        recordDict["mov"]      = self._bytearrayBitsToInt(singleRecordAsByteArray, 80, 80)
+        recordDict["ihb"]      = self._bytearrayBitsToInt(singleRecordAsByteArray, 81, 81)
+        month                  = self._bytearrayBitsToInt(singleRecordAsByteArray, 82, 85)
+        day                    = self._bytearrayBitsToInt(singleRecordAsByteArray, 86, 90)
+        hour                   = self._bytearrayBitsToInt(singleRecordAsByteArray, 91, 95)
+        year                   = self._bytearrayBitsToInt(singleRecordAsByteArray, 98, 103) + 2000
+        recordDict["bpm"]      = self._bytearrayBitsToInt(singleRecordAsByteArray, 104, 111)
+        recordDict["dia"]      = self._bytearrayBitsToInt(singleRecordAsByteArray, 112, 119)
+        recordDict["sys"]      = self._bytearrayBitsToInt(singleRecordAsByteArray, 120,  127) + 25
         recordDict["datetime"] = datetime.datetime(year, month, day, hour, minute, second)
         return recordDict
         

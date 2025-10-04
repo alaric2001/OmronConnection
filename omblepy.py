@@ -14,7 +14,7 @@ import json
 parentService_UUID        = "ecbe3980-c9a2-11e1-b1bd-0002a5d5c51b"
 
 #global variables
-bleClient           = None
+ble_client           = None
 examplePairingKey   = bytearray.fromhex("deadbeaf12341234deadbeaf12341234") #arbitrary choise
 deviceSpecific      = None                            #imported module for each device
 logger              = logging.getLogger("omblepy")
@@ -37,27 +37,35 @@ class bluetoothTxRxHandler:
                                 "0ae12b00-aee8-11e1-a192-0002a5d5c51b",
                                 "10e1ba60-aee8-11e1-89e5-0002a5d5c51b"
                             ]
-    deviceDataRxChannelIntHandles = [0x360, 0x370, 0x380, 0x390]
+    #deviceDataRxChannelIntHandles = [0x360, 0x370, 0x380, 0x390 ]
+    deviceDataRxChannelIntHandles = [31,0x31 ]
     deviceUnlock_UUID         = "b305b680-aee7-11e1-a730-0002a5d5c51b"
 
-    def __init__(self, pairing = False):
-        self.currentRxNotifyStateFlag   = False
-        self.rxPacketType               = None
-        self.rxEepromAddress            = None
-        self.rxDataBytes                = None
-        self.rxFinishedFlag             = False
-        self.rxRawChannelBuffer         = [None] * 4 #a buffer for each channel
+    def __init__(self, ble_client, pairing=False):
+        self.ble_client = ble_client
+        self.currentRxNotifyStateFlag = False
+        self.rxPacketType = None
+        self.rxEepromAddress = None
+        self.rxDataBytes = None
+        self.rxFinishedFlag = False
+        self.rxRawChannelBuffer = [None] * 4 #a buffer for each channel
 
     async def _enableRxChannelNotifyAndCallback(self):
         if(self.currentRxNotifyStateFlag != True):
             for rxChannelUUID in self.deviceRxChannelUUIDs:
-                await bleClient.start_notify(rxChannelUUID, self._callbackForRxChannels)
+                try:
+                    await self.ble_client.start_notify(rxChannelUUID, self._callbackForRxChannels)
+                except:
+                    logger.info(f"Failed notify callback on {rxChannelUUID}")
             self.currentRxNotifyStateFlag = True
 
     async def _disableRxChannelNotifyAndCallback(self):
         if(self.currentRxNotifyStateFlag != False):
             for rxChannelUUID in self.deviceRxChannelUUIDs:
-                await bleClient.stop_notify(rxChannelUUID)
+                try:
+                    await self.ble_client.stop_notify(rxChannelUUID)
+                except:
+                    logger.info(f"Failed disabling callback on {rxChannelUUID}")
             self.currentRxNotifyStateFlag = False
 
     def _callbackForRxChannels(self, BleakGATTChar, rxBytes):
@@ -111,7 +119,7 @@ class bluetoothTxRxHandler:
             requiredTxChannels = range((len(command) + 15) // 16)
             for channelIdx in requiredTxChannels:
                 logger.debug(f"tx ch{channelIdx} > {convertByteArrayToHexString(commandCopy[:16])}")
-                await bleClient.write_gatt_char(self.deviceTxChannelUUIDs[channelIdx], commandCopy[:16])
+                await self.ble_client.write_gatt_char(self.deviceTxChannelUUIDs[channelIdx], commandCopy[:16])
                 commandCopy = commandCopy[16:]
 
             currentTimeout = timeoutS
@@ -123,9 +131,9 @@ class bluetoothTxRxHandler:
             if(currentTimeout >= 0):
                 break
             retries += 1
-            logger.warning(f"Transmission failed, count of retries: {retries} / 5")
-            if(retries >= 5):
-                ValueError("Same transmission failed 5 times, abort")
+            logger.warning(f"Transmission failed, count of retries: {retries} / 3")
+            if(retries >= 3):
+                ValueError("Same transmission failed 3 times, abort")
                 return
 
     async def startTransmission(self):
@@ -212,9 +220,9 @@ class bluetoothTxRxHandler:
             raise ValueError(f"key has to be 16 bytes long, is {len(newKeyByteArray)}")
             return
         #enable key programming mode
-        await bleClient.start_notify(self.deviceUnlock_UUID, self._callbackForUnlockChannel)
+        await self.ble_client.start_notify(self.deviceUnlock_UUID, self._callbackForUnlockChannel)
         self.rxFinishedFlag = False
-        await bleClient.write_gatt_char(self.deviceUnlock_UUID, b'\x02' + b'\x00'*16, response=True)
+        await self.ble_client.write_gatt_char(self.deviceUnlock_UUID, b'\x02' + b'\x00'*16, response=True)
         while(self.rxFinishedFlag == False):
             await asyncio.sleep(0.1)
         deviceResponse = self.rxDataBytes
@@ -223,29 +231,29 @@ class bluetoothTxRxHandler:
             return
         #program new key
         self.rxFinishedFlag = False
-        await bleClient.write_gatt_char(self.deviceUnlock_UUID, b'\x00' + newKeyByteArray, response=True)
+        await self.ble_client.write_gatt_char(self.deviceUnlock_UUID, b'\x00' + newKeyByteArray, response=True)
         while(self.rxFinishedFlag == False):
             await asyncio.sleep(0.1)
         deviceResponse = self.rxDataBytes
         if(deviceResponse[:2] != bytearray.fromhex("8000")):
             raise ValueError(f"Failure to program new key. Response: {deviceResponse}")
             return
-        await bleClient.stop_notify(self.deviceUnlock_UUID)
+        await self.ble_client.stop_notify(self.deviceUnlock_UUID)
         logger.info(f"Paired device successfully with new key {newKeyByteArray}.")
         logger.info("From now on you can connect omit the -p flag, even on other PCs with different bluetooth-mac-addresses.")
         return
 
     async def unlockWithUnlockKey(self, keyByteArray = examplePairingKey):
-        await bleClient.start_notify(self.deviceUnlock_UUID, self._callbackForUnlockChannel)
+        await self.ble_client.start_notify(self.deviceUnlock_UUID, self._callbackForUnlockChannel)
         self.rxFinishedFlag = False
-        await bleClient.write_gatt_char(self.deviceUnlock_UUID, b'\x01' + keyByteArray, response=True)
+        await self.ble_client.write_gatt_char(self.deviceUnlock_UUID, b'\x01' + keyByteArray, response=True)
         while(self.rxFinishedFlag == False):
             await asyncio.sleep(0.1)
         deviceResponse = self.rxDataBytes
         if(deviceResponse[:2] !=  bytearray.fromhex("8100")):
             raise ValueError(f"entered pairing key does not match stored one.")
             return
-        await bleClient.stop_notify(self.deviceUnlock_UUID)
+        await self.ble_client.stop_notify(self.deviceUnlock_UUID)
         return
 
 def readCsv(filename):
@@ -305,8 +313,18 @@ async def selectBLEdevices():
             break
     return devices[int(res)][0]
 
+async def scanBLEDevices():
+    """Scan perangkat BLE tanpa input interaktif."""
+    from bleak import BleakScanner
+    devices = await BleakScanner.discover()
+    return [
+        # {"id": idx, "mac": dev.address, "name": dev.name or "Unknown", "rssi": dev.rssi}
+        {"id": idx, "mac": dev.address, "name": dev.name or "Unknown", "rssi": getattr(dev, 'rssi', None)}
+        for idx, dev in enumerate(devices)
+    ]
+
 async def main():
-    global bleClient
+    # global self.ble_client
     global deviceSpecific
     parser = argparse.ArgumentParser(description="python tool to read the records of omron blood pressure instruments")
     parser.add_argument('-d', "--device",     required="true", type=ascii,  help="Device name (e.g. HEM-7322T-D).")
@@ -354,42 +372,52 @@ async def main():
         print(" -remove previous device pairings in your OS's bluetooth dialog")
         print(" -enable bluetooth on you omron device and use the specified mode (pairing or normal)")
         print(" -do not accept any pairing dialog until you selected your device in the following list\n")
-        bleAddr = await selectBLEdevices()
-
-    bleClient = bleak.BleakClient(bleAddr)
+        bleAddr = await selectBLEdevices() if args.mac is None else args.mac.strip("'").strip('\"')
+    from bleak import BleakClient
+    ble_client = BleakClient(bleAddr)
     try:
         logger.info(f"Attempt connecting to {bleAddr}.")
-        await bleClient.connect()
+        await ble_client.connect()
         await asyncio.sleep(0.5)
-        await bleClient.pair(protection_level = 2)
+        await ble_client.pair(protection_level=2)
+        devSpecificDriver = deviceSpecific.deviceSpecificDriver()
         #verify that the device is an omron device by checking presence of certain bluetooth services
-        if parentService_UUID not in [service.uuid for service in bleClient.services]:
-            raise OSError("""Some required bluetooth attributes not found on this ble device.
-                            This means that either, you connected to a wrong device,
-                            or that your OS has a bug when reading BT LE device attributes (certain linux versions).""")
-            return
-        bluetoothTxRxObj = bluetoothTxRxHandler()
+        if devSpecificDriver.deviceCheckParentUUID:
+            if parentService_UUID not in [service.uuid for service in ble_client.services]:
+                logger.info(f"Looking for uuid {parentService_UUID}.")
+                for service in ble_client.services:
+                    logger.info(f"Service uuid : {service.uuid}.") 
+                raise OSError("""Some required bluetooth attributes not found on this ble device.
+                             This means that either, you connected to a wrong device,
+                             or that your OS has a bug when reading BT LE device attributes (certain linux versions).""")
+                return
+        bluetoothTxRxObj = bluetoothTxRxHandler(ble_client)
         if(args.pair):
-            await bluetoothTxRxObj.writeNewUnlockKey()
+            if devSpecificDriver.deviceUseLockUnlock:
+                await bluetoothTxRxObj.writeNewUnlockKey()
             #this seems to be necessary when the device has not been paired to any device
             await bluetoothTxRxObj.startTransmission()
             await bluetoothTxRxObj.endTransmission()
         else:
             logger.info("communication started")
-            devSpecificDriver = deviceSpecific.deviceSpecificDriver()
+            
             allRecs = await devSpecificDriver.getRecords(btobj = bluetoothTxRxObj, useUnreadCounter = args.newRecOnly, syncTime = args.timeSync)
             logger.info("communication finished")
             appendCsv(allRecs)
             saveUBPMJson(allRecs)
+    except Exception as e: 
+        logger.error("Error occured : " + str(e))
     finally:
         logger.info("unpair and disconnect")
-        if bleClient.is_connected:
-            await bleClient.unpair()
+        if ble_client.is_connected:
+#            await ble_client.unpair()
             try:
-                await bleClient.disconnect()
+                await ble_client.disconnect()
             except AssertionError as e:
                 logger.error("Bleak AssertionError during disconnect. This usually happens when using the bluezdbus adapter.")
                 logger.error("You can find the upstream issue at: https://github.com/hbldh/bleak/issues/641")
                 logger.error(f"AssertionError details: {e}")
 
-asyncio.run(main())
+# Hanya jalankan main() jika file ini dieksekusi langsung
+if __name__ == "__main__":
+    asyncio.run(main())
