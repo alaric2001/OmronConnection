@@ -24,7 +24,7 @@ Ikuti langkah-langkah di bawah ini secara berurutan untuk memastikan koneksi yan
 
 Sebelum menjalankan skrip, pastikan untuk:
 
-  * **Hapus Pemasangan Lama:** Buka pengaturan Bluetooth di sistem operasi Anda dan hapus tensimeter Omron dari daftar perangkat yang terhubung. Ini akan memastikan tidak ada konflik dengan data pemasangan yang usang.
+  * **Hapus Pemasangan Lama:** Buka pengaturan Bluetooth di sistem operasi Anda dan hapus tensimeter Omron **(BLESmart_00000480FAE4FAF7F7F7AC)** dari daftar perangkat yang terhubung. Ini akan memastikan tidak ada konflik dengan data pemasangan yang usang.
   * **Mode Pemasangan:** Aktifkan mode *pairing* pada tensimeter Omron Anda. Tekan dan tahan tombol Bluetooth pada perangkat hingga indikator Bluetooth berkedip atau menampilkan status "pairing".
 
 ### 2\. Pemasangan (Pairing)
