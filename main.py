@@ -6,6 +6,7 @@ from omblepy import bluetoothTxRxHandler, scanBLEDevices, appendCsv, saveUBPMJso
 import logging
 import os
 json_path = os.path.join('ubpm.json')
+import hashlib
 
 # Memastikan driver spesifik tersedia
 from deviceSpecific.hem_7142t1 import deviceSpecificDriver
@@ -101,6 +102,12 @@ def adjust_latest_to_today_non_destructive(latest_record, anchor_dt=None):
     rec["datetime"] = dt.replace(year=anchor_dt.year, month=anchor_dt.month, day=anchor_dt.day)
     return rec
 
+def generate_record_id(record): #Generate ID
+    """Generate unique ID from datetime"""
+    dt_str = record["datetime"].strftime("%Y%m%d%H%M%S") if isinstance(record["datetime"], datetime) else record["datetime"].replace("-", "").replace(":", "").replace(" ", "")
+    # Tambahkan sys/dia/bpm untuk extra uniqueness
+    unique_str = f"{dt_str}_{record['sys']}_{record['dia']}_{record['bpm']}"
+    return hashlib.md5(unique_str.encode()).hexdigest()[:12]  # 12 char hex
 
 
 @app.get("/")
@@ -171,6 +178,9 @@ async def connect_and_read_latest(data: ConnectAndReadInput):
 
                 # JANGAN adjust lagi - langsung pakai data asli
                 # latest_corrected = adjust_latest_to_today_non_destructive(latest_device_record)
+
+                # Generate ID
+                latest_device_record["id"] = generate_record_id(latest_device_record)
                 
                 # serializable
                 lr = dict(latest_device_record)
@@ -246,6 +256,7 @@ async def connect_and_read(data: ConnectAndReadInput):
                 
                 # BARU convert datetime ke string setelah sorting
                 for rec in all_records:
+                    rec["id"] = generate_record_id(rec) # Generate ID sebelum convert datetime ke string
                     if isinstance(rec["datetime"], datetime):
                         rec["datetime"] = rec["datetime"].strftime("%Y-%m-%d %H:%M:%S")
 

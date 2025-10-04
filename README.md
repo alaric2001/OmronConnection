@@ -1,4 +1,78 @@
-# Omblepy
+# Proyek Omron BLE Python
+
+Proyek ini menyediakan solusi berbasis Python untuk berkomunikasi dengan tensimeter Omron via Bluetooth Low Energy (BLE). Tujuannya adalah untuk membaca dan mengekspor data historis dari perangkat, khususnya model **HEM-7142T1** berupa API.
+
+## Persyaratan Sistem
+
+Pastikan Anda memiliki versi Python yang sesuai dan pustaka yang diperlukan terpasang sebelum memulai.
+
+  * **Python:** `3.10.12`
+  * **Pustaka Python:**
+    ```bash
+    pip install terminaltables bleak
+    ```
+
+## Teori Koneksi Awal
+
+Komunikasi dengan perangkat Omron memerlukan proses *pairing* yang aman untuk mengaktifkan koneksi terenkripsi. Proses ini biasanya hanya perlu dilakukan sekali. Proyek ini menggunakan skrip `omblepy.py` untuk mengelola proses *pairing* tersebut.
+
+## Panduan Penggunaan
+
+Ikuti langkah-langkah di bawah ini secara berurutan untuk memastikan koneksi yang berhasil.
+
+### 1\. Persiapan Awal
+
+Sebelum menjalankan skrip, pastikan untuk:
+
+  * **Hapus Pemasangan Lama:** Buka pengaturan Bluetooth di sistem operasi Anda dan hapus tensimeter Omron dari daftar perangkat yang terhubung. Ini akan memastikan tidak ada konflik dengan data pemasangan yang usang.
+  * **Mode Pemasangan:** Aktifkan mode *pairing* pada tensimeter Omron Anda. Tekan dan tahan tombol Bluetooth pada perangkat hingga indikator Bluetooth berkedip atau menampilkan status "pairing".
+
+### 2\. Pemasangan (Pairing)
+
+Lakukan pemasangan ulang menggunakan skrip berikut. Proses ini akan memprogram kunci pemasangan baru ke dalam perangkat Anda.
+
+```bash
+python ./omblepy.py -p -d hem-7142t1
+```
+
+  * **Penting:** Selama skrip berjalan, perhatikan layar tensimeter Omron Anda. Proses pemasangan berhasil jika layar monitor menunjukkan ikon berputar atau indikator lain yang menandakan *pairing* sedang berlangsung.
+  * Jika Anda melihat pesan kesalahan seperti:
+    ```
+    2025-10-04 21:41:11,667 - omblepy - INFO - Failed disabling callback on...
+    2025-10-04 21:41:11,667 - omblepy - INFO - unpair and disconnect
+    ```
+    Abaikan pesan ini **selama** indikator di monitor masih berputar. Skrip akan mencoba kembali dan biasanya berhasil. Jika indikator tidak berputar sama sekali, periksa kembali mode *pairing* perangkat Anda.
+
+### 3\. Sinkronisasi Waktu (Jika Diperlukan)
+
+Jika data waktu yang Anda baca dari perangkat salah, lakukan langkah-langkah berikut untuk mengoreksinya:
+
+  * **Hubungkan ke Aplikasi Resmi:** Konekkan tensimeter Anda ke aplikasi seluler **Omron Connect**.
+  * **Lakukan Pengukuran:** Buat satu pengukuran baru melalui aplikasi dan verifikasi hasilnya di Omron Connect. Ini akan menyinkronkan waktu perangkat dengan waktu ponsel Anda.
+  * **Hubungkan ke PC Lagi:** Setelah waktu di perangkat benar, hubungkan kembali ke PC menggunakan skrip. Data waktu seharusnya sudah benar.
+
+### 4\. Menggunakan API (FastAPI)
+
+Setelah *pairing* berhasil, Anda dapat menjalankan API untuk membaca data.
+
+```bash
+python -m uvicorn main:app --reload --host [Alamat IPv4] --port 8000
+```
+
+  * **[Alamat IPv4]** adalah alamat IP lokal Anda, yang dapat Anda temukan dengan menjalankan `ipconfig` (Windows) atau `ifconfig`/`ip a` (Linux/macOS).
+  * **Contoh:** `python -m uvicorn main:app --reload --host 192.666.66.666 --port 8000`
+
+Setelah API berjalan, Anda bisa mengujinya menggunakan Postman atau aplikasi sejenis dengan mengirimkan permintaan `POST` ke *endpoint* `/connect-and-read` atau `/latest-bp-records`.
+
+.
+.
+.
+.
+.
+# Referensi
+https://github.com/userx14/omblepy
+
+# Omblepy 
 
 Cli tool to read records from Omron Bluetooth-LE measurement instruments
 
