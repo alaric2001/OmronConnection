@@ -13,8 +13,6 @@ from datetime import datetime, timezone
 from copy import deepcopy
 
 
-
-
 logger              = logging.getLogger("omblepy")
 bleClient           = None
 deviceSpecific = None
@@ -49,7 +47,6 @@ RX_CHANNEL_UUIDS = [
 ]
 ble_client = None 
 
-#v3
 def parse_device_dt(dt):
     """
     Terima string atau datetime. Return datetime object (naive, lokal).
@@ -92,7 +89,6 @@ def normalize_records_datetime(records):
                 rec["datetime"] = dtobj
     return recs_copy
 
-
 def adjust_latest_to_today_non_destructive(latest_record, anchor_dt=None):
     """
     Return a copy of latest_record with date replaced to today's date, keep time.
@@ -104,6 +100,7 @@ def adjust_latest_to_today_non_destructive(latest_record, anchor_dt=None):
     # rec["_device_datetime_raw"] = rec.get("_device_datetime_raw", dt.isoformat())
     rec["datetime"] = dt.replace(year=anchor_dt.year, month=anchor_dt.month, day=anchor_dt.day)
     return rec
+
 
 
 @app.get("/")
@@ -163,14 +160,22 @@ async def connect_and_read_latest(data: ConnectAndReadInput):
 
                 normalized = normalize_records_datetime(records)
                 flat = [rec for per_user in normalized for rec in per_user]
+                
+                # Debug: print semua datetime untuk melihat datanya
+                print("All datetimes:", [rec["datetime"] for rec in flat])
+                
+                # Ambil yang terbaru berdasarkan datetime object
                 latest_device_record = max(flat, key=lambda r: r["datetime"])
+                
+                print("Latest found:", latest_device_record["datetime"])
 
-                latest_corrected = adjust_latest_to_today_non_destructive(latest_device_record)
-
+                # JANGAN adjust lagi - langsung pakai data asli
+                # latest_corrected = adjust_latest_to_today_non_destructive(latest_device_record)
+                
                 # serializable
-                lr = dict(latest_corrected)
+                lr = dict(latest_device_record)
                 if isinstance(lr["datetime"], datetime):
-                    lr["datetime"] = lr["datetime"].strftime("%Y-%m-%d %H:%M:%S")  # ✅ Format dengan spasi
+                    lr["datetime"] = lr["datetime"].strftime("%Y-%m-%d %H:%M:%S")
                     # lr["datetime"] = lr["datetime"].isoformat()
                 return {
                     "message": "Newest record read with success.",
@@ -227,14 +232,22 @@ async def connect_and_read(data: ConnectAndReadInput):
                 # HANYA normalize, JANGAN adjust
                 normalized = normalize_records_datetime(records)
 
+                
+
                 #Tanpa save ke CSV & JSON 
+                # Flatten dan SORT DULU berdasarkan datetime object
                 all_records = []
                 for user_records in normalized:
                     for rec in user_records:
-                        rec_copy = dict(rec)
-                        if isinstance(rec_copy["datetime"], datetime):
-                            rec_copy["datetime"] = rec_copy["datetime"].strftime("%Y-%m-%d %H:%M:%S")
-                        all_records.append(rec_copy)
+                        all_records.append(rec)
+                
+                # Sort berdasarkan datetime object (TERBARU KE TERLAMA)
+                all_records.sort(key=lambda r: r["datetime"], reverse=True)
+                
+                # BARU convert datetime ke string setelah sorting
+                for rec in all_records:
+                    if isinstance(rec["datetime"], datetime):
+                        rec["datetime"] = rec["datetime"].strftime("%Y-%m-%d %H:%M:%S")
 
                 return {
                     "message": "Data read successfully.",
@@ -260,5 +273,3 @@ async def connect_and_read(data: ConnectAndReadInput):
         import traceback
         print("TRACEBACK:", traceback.format_exc())
         raise HTTPException(status_code=500, detail=f"Error: {str(e)}")
-                    
-
