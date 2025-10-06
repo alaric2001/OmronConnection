@@ -167,14 +167,9 @@ async def connect_and_read_latest(data: ConnectAndReadInput):
 
                 normalized = normalize_records_datetime(records)
                 flat = [rec for per_user in normalized for rec in per_user]
-                
-                # Debug: print semua datetime untuk melihat datanya
-                print("All datetimes:", [rec["datetime"] for rec in flat])
-                
+                            
                 # Ambil yang terbaru berdasarkan datetime object
                 latest_device_record = max(flat, key=lambda r: r["datetime"])
-                
-                print("Latest found:", latest_device_record["datetime"])
 
                 # JANGAN adjust lagi - langsung pakai data asli
                 # latest_corrected = adjust_latest_to_today_non_destructive(latest_device_record)
